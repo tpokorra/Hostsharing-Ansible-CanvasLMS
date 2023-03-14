@@ -1,0 +1,29 @@
+canvas:
+  hosts:
+    xyz00:
+      ansible_ssh_host: xyz00.hostsharing.net
+      ansible_ssh_user: xyz00
+      pac: xyz00
+      domain: canvas.example.org
+      user: canvas
+      password: testpassw0rd_changeme
+
+      encryption_key_20_characters_minimum: 12345678901234567890
+
+      organisation_name: "Beispielverein"
+      admin_email: admin@{{domain}}
+      admin_password: CHANGEME
+
+      db_name: canvas
+      db_user: canvas
+      db_password: testpassw0rd2_changeme
+
+      redispassword: testpassw0rd_changeme
+      redisport: 11111
+
+      # see https://nodejs.org/en/about/releases/
+      noderelease: 16
+      # see https://nodejs.org/download/release/latest-v16.x/
+      nodeversion: v16.13.1
+      # see https://www.ruby-lang.org/en/downloads/releases/
+      rubyversion: 2.7.7

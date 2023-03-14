@@ -1,0 +1,9 @@
+production:
+  address: "{{pac}}.hostsharing.net"
+  port: "25"
+  user_name: "{{pac}}-{{user}}"
+  password: "{{password}}"
+  authentication: "plain" # plain, login, or cram_md5
+  domain: "{{domain}}"
+  outgoing_address: "canvas@{{domain}}"
+  default_name: "Instructure Canvas"

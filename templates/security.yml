@@ -1,0 +1,3 @@
+production: &default
+  # replace this with a random string of at least 20 characters
+  encryption_key: {{encryption_key_20_characters_minimum}}

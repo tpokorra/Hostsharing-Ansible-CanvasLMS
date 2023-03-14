@@ -1,0 +1,199 @@
+---
+- hosts: canvas
+  become_user: "{{pac}}-{{user}}"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    # see https://docs.ansible.com/ansible/latest/user_guide/become.html#risks-of-becoming-an-unprivileged-user
+    ansible_common_remote_group: "{{pac}}"
+    ansible_remote_tmp: ~/.ansible/tmp
+
+  tasks:
+
+  #################################
+  ## create directories
+  #################################
+  - name: create directory etc
+    become: yes
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/etc"
+      state: directory
+  - name: create directory var/tmp
+    become: yes
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/var/tmp"
+      state: directory
+  - name: create directory var/log
+    become: yes
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/var/log"
+      state: directory
+  - name: create directory var/run
+    become: yes
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/var/run"
+      state: directory
+
+  #################################
+  ## install requirements
+  #################################
+  - name: Install node.js
+    import_tasks: tasks/hs_nodejs.yml
+
+  - name: Install ruby
+    import_tasks: tasks/hs_ruby.yml
+
+  ##################################
+  ## install Canvas LMS
+  ##################################
+
+  - name: Check for git working tree
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    stat:
+      path: /home/pacs/{{pac}}/users/{{user}}/canvas
+    register: workingtree
+  - name: get repo
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    git:
+      repo: https://github.com/instructure/canvas-lms.git
+      dest: /home/pacs/{{pac}}/users/{{user}}/canvas
+      version: "prod"
+      single_branch: yes
+    when: not workingtree.stat.exists
+
+
+  ########################
+  ## install dependencies
+  ########################
+  - name: install ruby dependencies
+    become: yes
+    shell: |
+      . ~/.profile
+      gem update --system
+      gem install bundler
+      bundle config set --local path vendor/bundle
+      bundle install --without development test || exit -1
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/canvas/vendor/bundle"
+
+  - name: install node dependencies
+    become: yes
+    shell: |
+      . ~/.profile
+      yarn install || exit -1
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/canvas/vendor/bundle"
+
+  ##################################
+  ## configuration
+  ##################################
+  - name: upload the password for the postgresql database
+    become: yes
+    template:
+      src: "templates/pgpass"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/.pgpass"
+      mode: "700"
+
+  - name: copy config files
+    become: yes
+    shell: |
+      for config in delayed_jobs file_store security external_migration dynamic_settings; \
+         do cp config/$config.yml.example config/$config.yml; done
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/canvas/config/delayed_jobs.yml"
+
+  - name: upload the config for the database
+    become: yes
+    template:
+      src: "templates/database.yml"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/config"
+
+  - name: upload the config for outgoing mail
+    become: yes
+    template:
+      src: "templates/outgoing_mail.yml"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/config"
+
+  - name: upload the config for domain
+    become: yes
+    template:
+      src: "templates/domain.yml"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/config"
+
+  - name: upload the config for security
+    become: yes
+    template:
+      src: "templates/security.yml"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/config"
+
+  # config$ vi environments/production.rb
+  # war true: config.cache_classes = false
+
+  ######################
+  ## initialise instance
+  ######################
+  - name: initialise the database
+    become: yes
+    shell: |
+      . ~/.profile
+      #yarn gulp rev || exit -1
+      export CANVAS_LMS_ADMIN_EMAIL="{{admin_email}}"
+      export CANVAS_LMS_ADMIN_PASSWORD="{{admin_password}}"
+      export CANVAS_LMS_ACCOUNT_NAME="{{organisation_name}}"
+      export CANVAS_LMS_STATS_COLLECTION="opt_out"
+      RAILS_ENV=production bundle exec rails db:initial_setup || exit -1
+      RAILS_ENV=production bundle exec rails db:migrate || exit -1
+      touch /home/pacs/{{pac}}/users/{{user}}/.ansible_initialised
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_initialised"
+
+  ########################
+  ## setup the apache site
+  ########################
+
+  # TODO
+  - name: drop htdocs-ssl
+    become: yes
+    file:
+       path: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/htdocs-ssl"
+       state: absent
+  - name: create symbolic link for htdocs-ssl
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      src: "/home/pacs/{{pac}}/users/{{user}}/template/public"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/htdocs-ssl"
+      state: link
+
+
+  ####################################
+  ## install cron jobs
+  ####################################
+  - name: start monit as cronjob
+    become: yes
+    cron:
+      name: "start monit at reboot"
+      special_time: reboot
+      job: rm -f $HOME/var/run/* && /usr/bin/monit -c "$HOME/.monitrc"
+
+  ##############################################
+  ## start services via monit
+  ##############################################
+  - name: start monit
+    become: yes
+    shell: |
+      /usr/bin/monit -c ".monitrc"
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/var/run/monit.id"
+

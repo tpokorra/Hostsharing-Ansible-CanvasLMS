@@ -1,0 +1,4 @@
+production:
+  domain: "{{domain}}"
+  ssl: true
+  # files_domain: "canvasfiles.example.com"
