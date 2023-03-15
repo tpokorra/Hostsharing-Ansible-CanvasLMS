@@ -1,0 +1,4 @@
+CANVAS_LMS_ADMIN_EMAIL={{admin_email}}
+CANVAS_LMS_ADMIN_PASSWORD="{{admin_password}}"
+CANVAS_LMS_ACCOUNT_NAME="{{organisation_name}}"
+CANVAS_LMS_STATS_COLLECTION="opt_out"

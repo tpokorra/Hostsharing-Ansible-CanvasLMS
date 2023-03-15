@@ -1,0 +1,4 @@
+#PassengerFriendlyErrorPages on # falls nötig zum debuggen einkommentieren
+SetEnv TMPDIR /home/pacs/{{pac}}/users/{{user}}/var/tmp/
+SetEnv POSTGRESQL_VERSION 11
+PassengerRuby /home/pacs/{{pac}}/users/{{user}}/.rbenv/shims/ruby

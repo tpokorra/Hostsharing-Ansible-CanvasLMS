@@ -33,6 +33,12 @@
       path: "/home/pacs/{{pac}}/users/{{user}}/var/run"
       state: directory
 
+  - name: create directory files
+    become: yes
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/files"
+      state: directory
+
   #################################
   ## install requirements
   #################################
@@ -48,31 +54,38 @@
 
   - name: Check for git working tree
     become: yes
-    become_user: "{{pac}}-{{user}}"
     stat:
       path: /home/pacs/{{pac}}/users/{{user}}/canvas
     register: workingtree
   - name: get repo
     become: yes
-    become_user: "{{pac}}-{{user}}"
     git:
       repo: https://github.com/instructure/canvas-lms.git
       dest: /home/pacs/{{pac}}/users/{{user}}/canvas
       version: "prod"
-      single_branch: yes
+      #single_branch: yes
     when: not workingtree.stat.exists
 
+  - name: switch to older branch for stability
+    become: yes
+    shell: |
+      git checkout -b "{{canvas_git_branch}}"
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
 
   ########################
   ## install dependencies
   ########################
+  # see https://github.com/instructure/canvas-lms/wiki/Production-Start#bundler-and-canvas-dependencies
   - name: install ruby dependencies
     become: yes
     shell: |
       . ~/.profile
       gem update --system
-      gem install bundler
+      gem install bundler --version 2.2.33
       bundle config set --local path vendor/bundle
+      #bundle install || exit -1
       bundle install --without development test || exit -1
     args:
       executable: /bin/bash
@@ -87,7 +100,7 @@
     args:
       executable: /bin/bash
       chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
-      creates: "/home/pacs/{{pac}}/users/{{user}}/canvas/vendor/bundle"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/canvas/node_modules"
 
   ##################################
   ## configuration
@@ -133,34 +146,116 @@
       src: "templates/security.yml"
       dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/config"
 
-  # config$ vi environments/production.rb
-  # war true: config.cache_classes = false
+  - name: disable cache classes
+    become: yes
+    replace:
+      path: "/home/pacs/{{pac}}/users/{{user}}/canvas/config/environments/production.rb"
+      regexp: "^  config.cache_classes = .*"
+      replace: "  config.cache_classes = false"
 
   ######################
   ## initialise instance
   ######################
+
+  # unknown attribute 'singleton' for Delayed::Backend::ActiveRecord::Job
+  # see https://github.com/instructure/canvas-lms/issues/2034
+  - name: check for wrong migration file
+    become: yes
+    stat: path="/home/pacs/{{pac}}/users/{{user}}/canvas/db/migrate/20210812210129_add_singleton_column.rb"
+    register: wrong_migration
+
+  - name: move one migration file
+    become: yes
+    command: mv db/migrate/20210812210129_add_singleton_column.rb db/migrate/20111111214311_add_singleton_column.rb
+    args:
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+    when: wrong_migration.stat.exists
+
+  # see https://github.com/scisco/canvas-lms-docker/blob/master/.env.sample
+  - name: upload the env file
+    become: yes
+    template:
+      src: "templates/env"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/.env"
+
+  # see https://github.com/instructure/canvas-lms/wiki/Production-Start#database-population
   - name: initialise the database
     become: yes
     shell: |
       . ~/.profile
-      #yarn gulp rev || exit -1
+      # ./node_modules/.bin/gulp rev || exit -1
+      yarn gulp rev || exit -1
+      # see https://github.com/instructure/canvas-lms/issues/2035
+      mv db/migrate/20210823222355_change_immersive_reader_allowed_on_to_on.rb ~
       export CANVAS_LMS_ADMIN_EMAIL="{{admin_email}}"
       export CANVAS_LMS_ADMIN_PASSWORD="{{admin_password}}"
       export CANVAS_LMS_ACCOUNT_NAME="{{organisation_name}}"
       export CANVAS_LMS_STATS_COLLECTION="opt_out"
+      export SPRING_TMP_PATH=$HOME/var/tmp
       RAILS_ENV=production bundle exec rails db:initial_setup || exit -1
+      mv ~/20210823222355_change_immersive_reader_allowed_on_to_on.rb db/migrate/
       RAILS_ENV=production bundle exec rails db:migrate || exit -1
+      RAILS_ENV=production bundle exec rake db:reset_encryption_key_hash || exit -1
       touch /home/pacs/{{pac}}/users/{{user}}/.ansible_initialised
     args:
       executable: /bin/bash
       chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
       creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_initialised"
 
+  - name: compile the assets
+    become: yes
+    shell: |
+      yarn run build:css
+      RAILS_ENV=production bundle exec rake canvas:compile_assets || exit -1
+
+      # TODO: https://github.com/instructure/canvas-lms/issues/761
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+
+
+  # https://groups.google.com/g/canvas-lms-users/c/qUT1-FSGkME
+  # we are using Postgresql 11
+  # avoid error:
+  #    ActiveRecord::StatementInvalid (PG::UndefinedColumn: ERROR:  column "collisdeterministic" does not exist
+  #    LINE 1: ...e=pg_namespace.oid WHERE collprovider='i' AND NOT collisdete...
+  - name: upload the patch for postgresql 11
+    become: yes
+    template:
+      src: "templates/postgresql11.patch"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/"
+
+  - name: apply the patch for postgresql 11
+    become: yes
+    shell: |
+       patch -p1 < ../postgresql11.patch || exit true
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+
+  - name: drop original files path
+    become: yes
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/canvas/tmp/files"
+      state: absent
+
+  - name: create a symbolic link for files
+    become: yes
+    file:
+      src: "/home/pacs/{{pac}}/users/{{user}}/files"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/tmp/files"
+      state: link
+
+
   ########################
   ## setup the apache site
   ########################
+  - name: upload the htaccess file
+    become: yes
+    template:
+      src: "templates/htaccess"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/.htaccess"
 
-  # TODO
   - name: drop htdocs-ssl
     become: yes
     file:
@@ -168,10 +263,21 @@
        state: absent
   - name: create symbolic link for htdocs-ssl
     become: yes
-    become_user: "{{pac}}-{{user}}"
     file:
-      src: "/home/pacs/{{pac}}/users/{{user}}/template/public"
+      src: "/home/pacs/{{pac}}/users/{{user}}/canvas/public"
       dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/htdocs-ssl"
+      state: link
+
+  - name: drop app-ssl
+    become: yes
+    file:
+       path: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/app-ssl"
+       state: absent
+  - name: create symbolic link for app-ssl
+    become: yes
+    file:
+      src: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/app-ssl"
       state: link
 
 

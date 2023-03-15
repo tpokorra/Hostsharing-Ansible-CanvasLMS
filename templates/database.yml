@@ -4,5 +4,5 @@ production:
   database: {{pac}}_{{db_name}}
   host: localhost
   username: {{pac}}_{{db_user}}
-  password: {{pac}}_{{db_password}}
+  password: {{db_password}}
   timeout: 5000

@@ -1,0 +1,10 @@
+--- config/initializers/postgresql_adapter.rb.orig	2023-03-15 22:49:19.384115464 +0100
++++ config/initializers/postgresql_adapter.rb	2023-03-15 22:49:33.632418615 +0100
+@@ -234,7 +234,6 @@
+       INNER JOIN pg_namespace ON collnamespace=pg_namespace.oid
+       WHERE
+         collprovider='i' AND
+-        NOT collisdeterministic AND
+         collcollate LIKE '%-u-kn-true'
+     SQL
+   end
