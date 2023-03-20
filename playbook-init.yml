@@ -10,3 +10,5 @@
   tasks:
   - name: Create user, domain and database
     import_tasks: tasks/hs_basis.yml
+  - name: setup rce domain
+    hsdomain.js: name="rce.{{domain}}" owner="{{pac}}-{{user}}" exists="true"

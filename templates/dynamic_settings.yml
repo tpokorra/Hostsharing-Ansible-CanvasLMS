@@ -1,0 +1,8 @@
+production:
+  config:
+    canvas:
+      canvas:
+        encryption-secret: "{{ECOSYSTEM_KEY}}"
+        signing-secret: "{{ECOSYSTEM_SECRET}}"
+      rich-content-service:
+        app-host: "https://rce.{{domain}}/"

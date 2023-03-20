@@ -115,7 +115,7 @@
   - name: copy config files
     become: yes
     shell: |
-      for config in delayed_jobs file_store security external_migration dynamic_settings; \
+      for config in delayed_jobs file_store external_migration; \
          do cp config/$config.yml.example config/$config.yml; done
     args:
       executable: /bin/bash
@@ -138,6 +138,12 @@
     become: yes
     template:
       src: "templates/domain.yml"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/config"
+
+  - name: upload the config for rich content editor API
+    become: yes
+    template:
+      src: "templates/dynamic_settings.yml"
       dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/config"
 
   - name: upload the config for security
@@ -183,7 +189,6 @@
     become: yes
     shell: |
       . ~/.profile
-      # ./node_modules/.bin/gulp rev || exit -1
       yarn gulp rev || exit -1
       # see https://github.com/instructure/canvas-lms/issues/2035
       mv db/migrate/20210823222355_change_immersive_reader_allowed_on_to_on.rb ~
@@ -202,13 +207,15 @@
       chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
       creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_initialised"
 
+  # TODO: https://github.com/instructure/canvas-lms/issues/761
+  # gem install dress_code || exit -1
+  # test with: ~/canvas$ bin/dress_code config/styleguide.yml
   - name: compile the assets
     become: yes
     shell: |
-      yarn run build:css
+      . ~/.profile
+      yarn run build:css || exit -1
       RAILS_ENV=production bundle exec rake canvas:compile_assets || exit -1
-
-      # TODO: https://github.com/instructure/canvas-lms/issues/761
     args:
       executable: /bin/bash
       chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
@@ -228,7 +235,7 @@
   - name: apply the patch for postgresql 11
     become: yes
     shell: |
-       patch -p1 < ../postgresql11.patch || exit true
+       patch -p1 < ../postgresql11.patch || exit 0
     args:
       executable: /bin/bash
       chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
@@ -245,6 +252,32 @@
       src: "/home/pacs/{{pac}}/users/{{user}}/files"
       dest: "/home/pacs/{{pac}}/users/{{user}}/canvas/tmp/files"
       state: link
+
+  #####################
+  ## setup the rce api
+  #####################
+  - name: create directory rce_api
+    become: yes
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/rce_api"
+      state: directory
+  - name: download canvas rce api
+    become: yes
+    unarchive:
+      src: https://github.com/instructure/canvas-rce-api/archive/refs/tags/{{canvas_rce_api_version}}.tar.gz
+      remote_src: yes
+      dest: /home/pacs/{{pac}}/users/{{user}}/rce_api
+      extra_opts: [--strip-components=1]
+      creates: /home/pacs/{{pac}}/users/{{user}}/rce_api/package.json
+  - name: install node dependencies for rce_api
+    become: yes
+    shell: |
+      . ~/.profile
+      npm install --production || exit -1
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/rce_api"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/rce_api/node_modules"
 
 
   ########################
@@ -280,26 +313,52 @@
       dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/app-ssl"
       state: link
 
+  - name: upload the rce_api htaccess file
+    become: yes
+    template:
+      src: "templates/rce_htaccess"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/doms/rce.{{domain}}/.htaccess"
+  - name: drop htdocs-ssl for rce_api
+    become: yes
+    file:
+       path: "/home/pacs/{{pac}}/users/{{user}}/doms/rce.{{domain}}/htdocs-ssl"
+       state: absent
+  - name: drop app-ssl for rce_api
+    become: yes
+    file:
+       path: "/home/pacs/{{pac}}/users/{{user}}/doms/rce.{{domain}}/app-ssl"
+       state: absent
+  - name: create symbolic link for app-ssl for rce_api
+    become: yes
+    file:
+      src: "/home/pacs/{{pac}}/users/{{user}}/rce_api"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/doms/rce.{{domain}}/app-ssl"
+      state: link
+
 
   ####################################
   ## install cron jobs
   ####################################
-  - name: start monit as cronjob
-    become: yes
-    cron:
-      name: "start monit at reboot"
-      special_time: reboot
-      job: rm -f $HOME/var/run/* && /usr/bin/monit -c "$HOME/.monitrc"
+  #- name: start monit as cronjob
+  #  become: yes
+  #  cron:
+  #    name: "start monit at reboot"
+  #    special_time: reboot
+  #    job: rm -f $HOME/var/run/* && /usr/bin/monit -c "$HOME/.monitrc"
 
   ##############################################
   ## start services via monit
   ##############################################
-  - name: start monit
-    become: yes
-    shell: |
-      /usr/bin/monit -c ".monitrc"
-    args:
-      executable: /bin/bash
-      chdir: "/home/pacs/{{pac}}/users/{{user}}/"
-      creates: "/home/pacs/{{pac}}/users/{{user}}/var/run/monit.id"
+  #- name: start monit
+  #  become: yes
+  #  shell: |
+  #    /usr/bin/monit -c ".monitrc"
+  #  args:
+  #    executable: /bin/bash
+  #    chdir: "/home/pacs/{{pac}}/users/{{user}}/"
+  #    creates: "/home/pacs/{{pac}}/users/{{user}}/var/run/monit.id"
 
+
+# TODO start cronjob
+# TODO upload restart script
+# TODO logrotate for canvas/log/production.log

@@ -9,6 +9,8 @@ canvas:
       password: testpassw0rd_changeme
 
       encryption_key_20_characters_minimum: 12345678901234567890
+      ECOSYSTEM_KEY: 23456789012345678901
+      ECOSYSTEM_SECRET: 34567890123456789012
 
       organisation_name: "Beispielverein"
       admin_email: admin@{{domain}}
@@ -24,6 +26,12 @@ canvas:
       # see https://nodejs.org/en/about/releases/
       noderelease: 16
       # see https://nodejs.org/download/release/latest-v16.x/
-      nodeversion: v16.13.1
+      nodeversion: v16.19.1
       # see https://www.ruby-lang.org/en/downloads/releases/
       rubyversion: 2.7.7
+
+      # see https://github.com/instructure/canvas-lms/branches
+      canvas_git_branch: "stable/2023-02-01"
+
+      # see https://github.com/instructure/canvas-rce-api/tags
+      canvas_rce_api_version: "v1.24"

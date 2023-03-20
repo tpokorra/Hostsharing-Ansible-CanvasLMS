@@ -10,6 +10,8 @@
   #################################
   - name: drop domain
     hsdomain.js: name="{{domain}}" owner="{{pac}}-{{user}}" exists="false"
+  - name: drop rce domain
+    hsdomain.js: name="rce.{{domain}}" owner="{{pac}}-{{user}}" exists="false"
   - name: drop database
     hsdatabase.js: name="{{pac}}_{{db_user}}" user="{{pac}}_{{db_user}}" password="{{db_password}}" instance="postgresql" exists="false"
   - name: remove user
