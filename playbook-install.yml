@@ -77,6 +77,16 @@
   ########################
   ## install dependencies
   ########################
+
+  # for building the assets we need dress_code
+  - name: require gem dress_code
+    become: yes
+    lineinfile:
+      path: /home/pacs/{{pac}}/users/{{user}}/canvas/Gemfile.d/app.rb
+      regexp: '^gem "dress_code"'
+      line: 'gem "dress_code", "1.2.1"'
+      insertafter: '^gem "irb"'
+
   # see https://github.com/instructure/canvas-lms/wiki/Production-Start#bundler-and-canvas-dependencies
   - name: install ruby dependencies
     become: yes
@@ -207,14 +217,15 @@
       chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
       creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_initialised"
 
-  # TODO: https://github.com/instructure/canvas-lms/issues/761
-  # gem install dress_code || exit -1
+  # DONE: https://github.com/instructure/canvas-lms/issues/761
   # test with: ~/canvas$ bin/dress_code config/styleguide.yml
+  # export COMPILE_ASSETS_API_DOCS=0 avoids: Don't know how to build task 'doc:api'; see lib/tasks/canvas.rake
   - name: compile the assets
     become: yes
     shell: |
       . ~/.profile
       yarn run build:css || exit -1
+      export COMPILE_ASSETS_API_DOCS=0
       RAILS_ENV=production bundle exec rake canvas:compile_assets || exit -1
     args:
       executable: /bin/bash
