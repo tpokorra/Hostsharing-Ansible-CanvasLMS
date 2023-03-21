@@ -246,10 +246,19 @@
   - name: apply the patch for postgresql 11
     become: yes
     shell: |
-       patch -p1 < ../postgresql11.patch || exit 0
+       patch -p0 < ../postgresql11.patch
     args:
       executable: /bin/bash
       chdir: "/home/pacs/{{pac}}/users/{{user}}/canvas"
+
+  # we cannot write to /tmp; setting ATTACHMENT_FU_TEMPFILE_PATH in htaccess does not help
+  # setting ATTACHMENT_FU_TEMPFILE_PATH in canvas/config/initializers/tmp_constants.rb did also not work?
+  - name: fix tmp path for attachment fu
+    become: yes
+    replace:
+      path: "/home/pacs/{{pac}}/users/{{user}}/canvas/gems/attachment_fu/lib/attachment_fu/railtie.rb"
+      regexp: '^      AttachmentFu.tempfile_path = "/tmp/attachment_fu"'
+      replace: '      AttachmentFu.tempfile_path = "/home/pacs/{{pac}}/users/{{user}}/var/tmp/"'
 
   - name: drop original files path
     become: yes

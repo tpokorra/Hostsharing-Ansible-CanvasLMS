@@ -9,6 +9,7 @@ canvas:
       password: testpassw0rd_changeme
 
       encryption_key_20_characters_minimum: 12345678901234567890
+      # both key and secret must be exactly 32 bytes
       ECOSYSTEM_KEY: 23456789012345678901
       ECOSYSTEM_SECRET: 34567890123456789012
 
