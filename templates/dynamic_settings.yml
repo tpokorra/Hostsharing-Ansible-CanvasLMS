@@ -2,7 +2,7 @@ production:
   config:
     canvas:
       canvas:
-        encryption-secret: "{{ECOSYSTEM_KEY}}"
-        signing-secret: "{{ECOSYSTEM_SECRET}}"
+        encryption-secret: "{{ECOSYSTEM_SECRET}}"
+        signing-secret: "{{ECOSYSTEM_KEY}}"
       rich-content-service:
         app-host: "https://rce.{{domain}}/"

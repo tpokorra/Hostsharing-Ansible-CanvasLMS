@@ -2,7 +2,7 @@ PassengerFriendlyErrorPages Off
 SetEnv ECOSYSTEM_KEY {{ECOSYSTEM_KEY}}
 SetEnv ECOSYSTEM_SECRET {{ECOSYSTEM_SECRET}}
 SetEnv NODE_ENV production
-SetEnv STATSD_HOST statsd
-SetEnv STATSD_PORT 0
+SetEnv STATSD_HOST 127.0.0.1
+SetEnv STATSD_PORT {{STATSD_PORT}}
 
 PassengerNodejs /home/pacs/{{pac}}/users/{{user}}/.nvm/versions/node/{{nodeversion}}/bin/node

@@ -13,6 +13,8 @@ canvas:
       ECOSYSTEM_KEY: 23456789012345678901
       ECOSYSTEM_SECRET: 34567890123456789012
 
+      STATSD_PORT: 8125
+
       organisation_name: "Beispielverein"
       admin_email: admin@{{domain}}
       admin_password: CHANGEME

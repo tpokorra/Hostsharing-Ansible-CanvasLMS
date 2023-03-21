@@ -298,6 +298,11 @@
       executable: /bin/bash
       chdir: "/home/pacs/{{pac}}/users/{{user}}/rce_api"
       creates: "/home/pacs/{{pac}}/users/{{user}}/rce_api/node_modules"
+  - name: upload the rce_api env file
+    become: yes
+    template:
+      src: "templates/rce_env"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/rce_api/.env"
 
 
   ########################
