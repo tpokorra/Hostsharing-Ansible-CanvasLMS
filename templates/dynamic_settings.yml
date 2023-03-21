@@ -5,4 +5,4 @@ production:
         encryption-secret: "{{ECOSYSTEM_SECRET}}"
         signing-secret: "{{ECOSYSTEM_KEY}}"
       rich-content-service:
-        app-host: "https://rce.{{domain}}/"
+        app-host: "https://rce.{{domain}}"

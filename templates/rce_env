@@ -1,4 +1,5 @@
-RCE_API_HOST="https://rce{{domain}}"
+NOT_RCE_API_HOST="https://rce.{{domain}}"
+PORT={{RCE_API_PORT}}
 NODE_ENV=production
 STATSD_HOST=127.0.0.1
 STATSD_PORT={{STATSD_PORT}}

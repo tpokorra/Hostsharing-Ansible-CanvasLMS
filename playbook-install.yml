@@ -343,10 +343,10 @@
     template:
       src: "templates/rce_htaccess"
       dest: "/home/pacs/{{pac}}/users/{{user}}/doms/rce.{{domain}}/.htaccess"
-  - name: drop htdocs-ssl for rce_api
+  - name: drop htdocs-ssl/.htaccess for rce_api
     become: yes
     file:
-       path: "/home/pacs/{{pac}}/users/{{user}}/doms/rce.{{domain}}/htdocs-ssl"
+       path: "/home/pacs/{{pac}}/users/{{user}}/doms/rce.{{domain}}/htdocs-ssl/.htaccess"
        state: absent
   - name: drop app-ssl for rce_api
     become: yes

@@ -9,11 +9,12 @@ canvas:
       password: testpassw0rd_changeme
 
       encryption_key_20_characters_minimum: 12345678901234567890
-      # both key and secret must be exactly 32 bytes
+      # both key and secret must be exactly 32 bytes, and probably the same
       ECOSYSTEM_KEY: 23456789012345678901
-      ECOSYSTEM_SECRET: 34567890123456789012
+      ECOSYSTEM_SECRET: 23456789012345678901
 
       STATSD_PORT: 8125
+      RCE_API_PORT: 3001
 
       organisation_name: "Beispielverein"
       admin_email: admin@{{domain}}
